@@ -3,6 +3,7 @@ module github.com/pion/webrtc/v2
 go 1.12
 
 require (
+	github.com/gorilla/websocket v1.4.2
 	github.com/pion/datachannel v1.4.17
 	github.com/pion/dtls/v2 v2.0.1
 	github.com/pion/ice v0.7.15
@@ -17,3 +18,5 @@ require (
 	github.com/sclevine/agouti v3.0.0+incompatible
 	github.com/stretchr/testify v1.6.1
 )
+
+replace github.com/pion/ice => /hpcnt/pion-ice

@@ -281,7 +281,7 @@ func (t *DTLSTransport) Start(remoteParameters DTLSParameters) error {
 
 		cert := t.certificates[0]
 		t.onStateChange(DTLSTransportStateConnecting)
-
+		//glenn
 		return t.role(), &dtls.Config{
 			Certificates: []tls.Certificate{
 				{

@@ -270,7 +270,7 @@ type mediaSection struct {
 }
 
 // populateSDP serializes a PeerConnections state into an SDP
-func populateSDP(d *sdp.SessionDescription, isPlanB bool, isICELite bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState) (*sdp.SessionDescription, error) {
+func populateSDP(d *sdp.SessionDescription, isPlanB bool, isICELite bool, isTrickle bool, mediaEngine *MediaEngine, connectionRole sdp.ConnectionRole, candidates []ICECandidate, iceParams ICEParameters, mediaSections []mediaSection, iceGatheringState ICEGatheringState) (*sdp.SessionDescription, error) {
 	var err error
 
 	bundleValue := "BUNDLE"
@@ -302,6 +302,11 @@ func populateSDP(d *sdp.SessionDescription, isPlanB bool, isICELite bool, mediaE
 	if isICELite {
 		// RFC 5245 S15.3
 		d = d.WithValueAttribute(sdp.AttrKeyICELite, sdp.AttrKeyICELite)
+		d = d.WithValueAttribute("ice-options", "trickle")
+	}
+
+	if isTrickle {
+		d = d.WithValueAttribute("ice-options", "trickle")
 	}
 	return d.WithValueAttribute(sdp.AttrKeyGroup, bundleValue), nil
 }

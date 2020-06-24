@@ -168,6 +168,7 @@ func (g *ICEGatherer) Gather() error {
 	}); err != nil {
 		return err
 	}
+	//glenn
 	return agent.GatherCandidates()
 }
 

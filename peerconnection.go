@@ -857,7 +857,7 @@ func (pc *PeerConnection) SetRemoteDescription(desc SessionDescription) error {
 	}
 
 	iceRole := ICERoleControlled
-	// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.
+	// If one of the agents is lite and the other one is not, the lite agent must be the controlling agent.i
 	// If both or neither agents are lite the offering agent is controlling.
 	// RFC 8445 S6.1.1
 	if (weOffer && remoteIsLite == pc.api.settingEngine.candidates.ICELite) || (remoteIsLite && !pc.api.settingEngine.candidates.ICELite) {
@@ -1786,8 +1786,7 @@ func (pc *PeerConnection) generateUnmatchedSDP(useIdentity bool) (*sdp.SessionDe
 
 		mediaSections = append(mediaSections, mediaSection{id: strconv.Itoa(len(mediaSections)), data: true})
 	}
-
-	return populateSDP(d, isPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState())
+	return populateSDP(d, isPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.settingEngine.candidates.ICETrickle, pc.api.mediaEngine, connectionRoleFromDtlsRole(defaultDtlsRoleOffer), candidates, iceParams, mediaSections, pc.ICEGatheringState())
 }
 
 // generateMatchedSDP generates a SDP and takes the remote state into account
@@ -1887,5 +1886,5 @@ func (pc *PeerConnection) generateMatchedSDP(useIdentity bool, includeUnmatched 
 		pc.log.Info("Plan-B Offer detected; responding with Plan-B Answer")
 	}
 
-	return populateSDP(d, detectedPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState())
+	return populateSDP(d, detectedPlanB, pc.api.settingEngine.candidates.ICELite, pc.api.settingEngine.candidates.ICETrickle, pc.api.mediaEngine, connectionRole, candidates, iceParams, mediaSections, pc.ICEGatheringState())
 }

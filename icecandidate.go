@@ -139,6 +139,7 @@ func (c ICECandidate) String() string {
 	return ic.String()
 }
 
+//glenn
 func iceCandidateToSDP(c ICECandidate) sdp.ICECandidate {
 	return sdp.ICECandidate{
 		Foundation:     c.Foundation,
