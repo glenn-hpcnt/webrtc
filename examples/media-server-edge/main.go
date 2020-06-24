@@ -252,6 +252,6 @@ func handleDestroyView(dvr DestroyViewRequest) *DestroyViewResponse {
 		fmt.Println("no such endpoint, streamId: ", session.StreamId)
 		return dvRes
 	}
-	ep.(*EndPoint).DetachSession(session.Id)
+	go ep.(*EndPoint).DetachSession(session.Id)
 	return dvRes
 }
