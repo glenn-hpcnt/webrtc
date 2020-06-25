@@ -35,7 +35,9 @@ func websocketHandlerFunc(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Failed to upgrade http connection to websocket")
 		return
 	}
-	go Pump(c)
+	sendCh := make(chan []byte, 1024)
+	go readPump(c, sendCh)
+	go writePump(c, sendCh)
 }
 func validateStreamHandlerFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -49,7 +51,7 @@ func validateStreamHandlerFunc(w http.ResponseWriter, r *http.Request) {
 	w.Write(b)
 }
 
-func Pump(conn *websocket.Conn) {
+func readPump(conn *websocket.Conn, sendCh chan<- []byte) {
 	for {
 		_, buf, err := conn.ReadMessage()
 		if err != nil {
@@ -79,9 +81,7 @@ func Pump(conn *websocket.Conn) {
 					if err != nil {
 						panic(err)
 					}
-					if err = conn.WriteMessage(websocket.TextMessage, buf); err != nil {
-						panic(err)
-					}
+					sendCh <- buf
 				}()
 			case "createView":
 				go func() {
@@ -94,9 +94,7 @@ func Pump(conn *websocket.Conn) {
 					if err != nil {
 						panic(err)
 					}
-					if err = conn.WriteMessage(websocket.TextMessage, buf); err != nil {
-						panic(err)
-					}
+					sendCh <- buf
 				}()
 			case "startStream":
 				go func() {
@@ -109,9 +107,7 @@ func Pump(conn *websocket.Conn) {
 					if err != nil {
 						panic(err)
 					}
-					if err = conn.WriteMessage(websocket.TextMessage, buf); err != nil {
-						panic(err)
-					}
+					sendCh <- buf
 				}()
 			case "configureView":
 				go func() {
@@ -129,9 +125,7 @@ func Pump(conn *websocket.Conn) {
 					if err != nil {
 						panic(err)
 					}
-					if err = conn.WriteMessage(websocket.TextMessage, buf); err != nil {
-						panic(err)
-					}
+					sendCh <- buf
 				}()
 			case "destroyView":
 				go func() {
@@ -144,9 +138,7 @@ func Pump(conn *websocket.Conn) {
 					if err != nil {
 						panic(err)
 					}
-					if err = conn.WriteMessage(websocket.TextMessage, buf); err != nil {
-						panic(err)
-					}
+					sendCh <- buf
 				}()
 			default:
 				fmt.Println("unexpected message is arrived, msg: ", string(buf))
@@ -166,10 +158,16 @@ func Pump(conn *websocket.Conn) {
 				if err != nil {
 					panic(err)
 				}
-				if err = conn.WriteMessage(websocket.TextMessage, buf); err != nil {
-					panic(err)
-				}
+				sendCh <- buf
 			}()
+		}
+	}
+}
+
+func writePump(conn *websocket.Conn, sendCh <-chan []byte) {
+	for buf := range sendCh {
+		if err := conn.WriteMessage(websocket.TextMessage, buf); err != nil {
+			panic(err)
 		}
 	}
 }
