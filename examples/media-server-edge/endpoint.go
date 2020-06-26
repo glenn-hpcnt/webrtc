@@ -1,11 +1,9 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"net"
-	"sync"
 )
 
 const (
@@ -22,10 +20,19 @@ type EndPoint struct {
 	videoUdpConn     *net.UDPConn
 	video2UdpConn    *net.UDPConn
 	audioUdpConn     *net.UDPConn
-	videoChannelMap  sync.Map
-	video2ChannelMap sync.Map
-	audioChannelMap  sync.Map
+	audioSessionChan chan *mediaChannel
+	videoSessionChan chan *mediaChannel
 	EndpointData
+}
+
+type mediaChannel struct {
+	id string
+	ch chan []byte
+}
+
+type mediaData struct {
+	buf []byte
+	len int
 }
 
 func CreateEndPoint(addr string, streamId string) (ep *EndPoint, err error) {
@@ -51,13 +58,15 @@ func CreateEndPoint(addr string, streamId string) (ep *EndPoint, err error) {
 	}
 
 	ep = &EndPoint{
-		Id:            streamId,
-		forwarderId:   forwarderId,
-		originAddr:    addr,
-		EndpointData:  epData,
-		audioUdpConn:  conns.audioUdpConn,
-		videoUdpConn:  conns.videoUdpConn,
-		video2UdpConn: conns.video2UdpConn,
+		Id:               streamId,
+		forwarderId:      forwarderId,
+		originAddr:       addr,
+		EndpointData:     epData,
+		audioUdpConn:     conns.audioUdpConn,
+		videoUdpConn:     conns.videoUdpConn,
+		video2UdpConn:    conns.video2UdpConn,
+		audioSessionChan: make(chan *mediaChannel, 128),
+		videoSessionChan: make(chan *mediaChannel, 128),
 	}
 	go ep.run()
 	return ep, nil
@@ -72,46 +81,112 @@ func (e *EndPoint) Close() {
 }
 
 func (e *EndPoint) AttachSession(s *Session) error {
-	_, prs := e.audioChannelMap.LoadOrStore(s.Id, s.AudioChan)
-	if prs {
-		return errors.New("already has session")
+	e.audioSessionChan <- &mediaChannel{
+		id: s.Id,
+		ch: s.AudioChan,
 	}
-	_, prs = e.videoChannelMap.LoadOrStore(s.Id, s.VideoChan)
-	if prs {
-		return errors.New("already has session")
+	e.videoSessionChan <- &mediaChannel{
+		id: s.Id,
+		ch: s.VideoChan,
 	}
 	return nil
 }
 
 func (e *EndPoint) DetachSession(id string) {
-	e.audioChannelMap.Delete(id)
-	e.videoChannelMap.Delete(id)
+	e.audioSessionChan <- &mediaChannel{
+		id: id,
+		ch: nil,
+	}
+	e.videoSessionChan <- &mediaChannel{
+		id: id,
+		ch: nil,
+	}
 }
 
 func (e *EndPoint) run() {
-	go e.audioListener()
-	go e.videoListener()
-	go e.videoListener2()
+	audioChan := make(chan *mediaData, 128)
+	go e.audioListener(audioChan)
+	go e.audioSender(audioChan)
+
+	videoChan := make(chan *mediaData, 128)
+	go e.videoListener(videoChan)
+	go e.videoListener2(videoChan)
+	go e.videoSender(videoChan)
 }
 
-func (e *EndPoint) audioListener() {
+func (e *EndPoint) audioListener(audioChan chan<- *mediaData) {
 	inboundRTPPacket := make([]byte, 4096)
 	for {
 		n, _, err := e.audioUdpConn.ReadFromUDP(inboundRTPPacket)
 		if err != nil {
 			fmt.Println("failed to read udp, close audio listener err: ", err)
+			close(audioChan)
 			break
 		}
-		e.audioChannelMap.Range(func(id, audioChan interface{}) bool {
-			data := make([]byte, n)
-			copy(data, inboundRTPPacket[:n])
-			audioChan.(chan []byte) <- data
-			return true
-		})
+		data := make([]byte, n)
+		copy(data, inboundRTPPacket[:n])
+		audioChan <- &mediaData{
+			buf: data,
+			len: n,
+		}
 	}
 }
 
-func (e *EndPoint) videoListener() {
+func (e *EndPoint) audioSender(audioChan <-chan *mediaData) {
+	m := make(map[string]chan []byte)
+	for {
+		select {
+		case mData, ok := <-audioChan:
+			if !ok {
+				fmt.Println("audio duplex session closed: ", e.Id)
+				break
+			}
+			data := make([]byte, mData.len)
+			copy(data, mData.buf)
+			for _, userCh := range m {
+				userCh <- data
+			}
+		case mc := <-e.audioSessionChan:
+			if mc.ch == nil {
+				delete(m, mc.id)
+			}
+			if _, prs := m[mc.id]; prs {
+				fmt.Println("already has audio duplex channel, id:", mc.id)
+			} else {
+				m[mc.id] = mc.ch
+			}
+		}
+	}
+}
+
+func (e *EndPoint) videoSender(videoChan <-chan *mediaData) {
+	m := make(map[string]chan []byte)
+	for {
+		select {
+		case mData, ok := <-videoChan:
+			if !ok {
+				fmt.Println("video duplex channel closed: ", e.Id)
+				break
+			}
+			data := make([]byte, mData.len)
+			copy(data, mData.buf)
+			for _, userCh := range m {
+				userCh <- data
+			}
+		case mc := <-e.videoSessionChan:
+			if mc.ch == nil {
+				delete(m, mc.id)
+			}
+			if _, prs := m[mc.id]; prs {
+				fmt.Println("already has video duplex channel, id:", mc.id)
+			} else {
+				m[mc.id] = mc.ch
+			}
+		}
+	}
+}
+
+func (e *EndPoint) videoListener(videoChan chan<- *mediaData) {
 	inboundRTPPacket := make([]byte, 4096)
 	for {
 		_, _, err := e.videoUdpConn.ReadFromUDP(inboundRTPPacket)
@@ -123,7 +198,7 @@ func (e *EndPoint) videoListener() {
 	}
 }
 
-func (e *EndPoint) videoListener2() {
+func (e *EndPoint) videoListener2(videoChan chan<- *mediaData) {
 	inboundRTPPacket := make([]byte, 4096)
 	for {
 		n, _, err := e.video2UdpConn.ReadFromUDP(inboundRTPPacket)
@@ -131,11 +206,11 @@ func (e *EndPoint) videoListener2() {
 			fmt.Println("failed to read udp, close video2 listener err: ", err)
 			break
 		}
-		e.videoChannelMap.Range(func(id, videoChan interface{}) bool {
-			data := make([]byte, n)
-			copy(data, inboundRTPPacket[:n])
-			videoChan.(chan []byte) <- data
-			return true
-		})
+		data := make([]byte, n)
+		copy(data, inboundRTPPacket[:n])
+		videoChan <- &mediaData{
+			buf: data,
+			len: n,
+		}
 	}
 }
