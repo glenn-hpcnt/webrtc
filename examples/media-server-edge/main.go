@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -179,7 +180,16 @@ func handleCreateView(cvr CreateViewRequest) *CreateViewResponse {
 	var endPoint *EndPoint
 	if e, prs := endPointMap.Load(cvr.StreamId); prs {
 		fmt.Println(cvr.StreamId + " already has endpoint.")
-		endPoint = e.(*EndPoint)
+		if atomic.LoadInt32(e.(*EndPoint).count) > 100 {
+			e, err := CreateEndPoint("10.207.11.156:8080", cvr.StreamId)
+			if err != nil {
+				panic(err)
+			}
+			endPointMap.Store(cvr.StreamId, e)
+			endPoint = e
+		} else {
+			endPoint = e.(*EndPoint)
+		}
 	} else {
 		e, err := CreateEndPoint("10.207.11.156:8080", cvr.StreamId)
 		if err != nil {

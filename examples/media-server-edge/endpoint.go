@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"sync/atomic"
 )
 
 const (
@@ -15,6 +16,7 @@ var hClient = NewClient()
 
 type EndPoint struct {
 	Id               string
+	count            *int32
 	forwarderId      string
 	originAddr       string
 	videoUdpConn     *net.UDPConn
@@ -81,6 +83,7 @@ func (e *EndPoint) Close() {
 }
 
 func (e *EndPoint) AttachSession(s *Session) error {
+	atomic.AddInt32(e.count, 1)
 	e.audioSessionChan <- &mediaChannel{
 		id: s.Id,
 		ch: s.AudioChan,
@@ -93,6 +96,7 @@ func (e *EndPoint) AttachSession(s *Session) error {
 }
 
 func (e *EndPoint) DetachSession(id string) {
+	atomic.AddInt32(e.count, -1)
 	e.audioSessionChan <- &mediaChannel{
 		id: id,
 		ch: nil,
