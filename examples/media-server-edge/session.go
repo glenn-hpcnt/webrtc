@@ -31,6 +31,7 @@ func CreateSession(viewId, streamId string) (*Session, string) {
 	settingEngine := webrtc.SettingEngine{}
 	//settingEngine.SetTrickle(true) // 실제로 받는 candidate가 없을 것임.
 	settingEngine.SetLite(true)
+	settingEngine.SetNAT1To1IPs([]string{"3.112.113.96"}, webrtc.ICECandidateTypeHost)
 	settingEngine.SetEphemeralUDPPortRange(10000, 40000)
 	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine), webrtc.WithSettingEngine(settingEngine))
 	peerConnectionConfig := webrtc.Configuration{}
