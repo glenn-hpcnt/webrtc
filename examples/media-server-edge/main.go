@@ -181,6 +181,7 @@ func handleCreateView(cvr CreateViewRequest) *CreateViewResponse {
 	if e, prs := endPointMap.Load(cvr.StreamId); prs {
 		fmt.Println(cvr.StreamId + " already has endpoint.")
 		if atomic.LoadInt32(e.(*EndPoint).count) > 100 {
+			fmt.Println(cvr.StreamId + "create new endpoint on current stream sessions.")
 			e, err := CreateEndPoint("10.207.11.156:8080", cvr.StreamId)
 			if err != nil {
 				panic(err)
@@ -191,6 +192,7 @@ func handleCreateView(cvr CreateViewRequest) *CreateViewResponse {
 			endPoint = e.(*EndPoint)
 		}
 	} else {
+		fmt.Println(cvr.StreamId + "create new endpoint")
 		e, err := CreateEndPoint("10.207.11.156:8080", cvr.StreamId)
 		if err != nil {
 			panic(err)
