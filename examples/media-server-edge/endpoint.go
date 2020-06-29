@@ -61,6 +61,7 @@ func CreateEndPoint(addr string, streamId string) (ep *EndPoint, err error) {
 
 	ep = &EndPoint{
 		Id:               streamId,
+		count:            new(int32),
 		forwarderId:      forwarderId,
 		originAddr:       addr,
 		EndpointData:     epData,
