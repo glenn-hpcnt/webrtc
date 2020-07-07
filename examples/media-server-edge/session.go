@@ -105,9 +105,9 @@ func (s *Session) GetREMBPeriodically() {
 			panic(err)
 		}
 		for _, v := range rtcps {
-			remb, ok := v.(*rtcp.ReceiverEstimatedMaximumBitrate)
-			if ok {
-				println(fmt.Sprintf("bitrate: %d", remb.Bitrate))
+			switch v.(type) {
+			case *rtcp.ReceiverEstimatedMaximumBitrate:
+				println(fmt.Sprintf("bitrate: %d", v.(*rtcp.ReceiverEstimatedMaximumBitrate).Bitrate))
 			}
 		}
 	}
