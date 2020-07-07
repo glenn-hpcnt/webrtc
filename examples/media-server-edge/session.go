@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/pion/rtcp"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v2"
 	"github.com/pion/webrtc/v2/examples/internal/signal"
@@ -99,12 +100,16 @@ func (s *Session) GetREMBPeriodically() {
 	timer := time.NewTicker(time.Second)
 	defer timer.Stop()
 	for range timer.C {
-		b := make([]byte, 1500)
-		buf, err := s.videoSender.Read(b)
+		rtcps, err := s.videoSender.ReadRTCP()
 		if err != nil {
 			panic(err)
 		}
-		println(string(buf))
+		for _, v := range rtcps {
+			remb, ok := v.(*rtcp.ReceiverEstimatedMaximumBitrate)
+			if ok {
+				println(fmt.Sprintf("bitrate: %d", remb.Bitrate))
+			}
+		}
 	}
 }
 
