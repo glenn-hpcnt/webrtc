@@ -26,7 +26,12 @@ func CreateSession(viewId, streamId string) (*Session, string) {
 		AudioChan: make(chan []byte, 128),
 	}
 	mediaEngine := webrtc.MediaEngine{}
-	mediaEngine.RegisterCodec(webrtc.NewRTPVP8Codec(webrtc.DefaultPayloadTypeVP8, 90000))
+	mediaEngine.RegisterCodec(webrtc.NewRTPVP8CodecExt(webrtc.DefaultPayloadTypeVP8, 90000,
+		[]webrtc.RTCPFeedback{{Type: webrtc.TypeRTCPFBGoogREMB},
+			{Type: webrtc.TypeRTCPFBNACK, Parameter: "pli"},
+			{Type: webrtc.TypeRTCPFBNACK}},
+		""))
+
 	mediaEngine.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000))
 
 	settingEngine := webrtc.SettingEngine{}
@@ -59,7 +64,6 @@ func CreateSession(viewId, streamId string) (*Session, string) {
 	if err := peerConnection.SetLocalDescription(sd); err != nil {
 		panic(err)
 	}
-
 	peerConnection.OnICEConnectionStateChange(func(state webrtc.ICEConnectionState) {
 		fmt.Println(state)
 	})
