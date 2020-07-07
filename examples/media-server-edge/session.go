@@ -96,7 +96,7 @@ func (s *Session) run() {
 }
 
 func (s *Session) GetREMBPeriodically() {
-	timer := time.NewTimer(time.Minute)
+	timer := time.NewTimer(time.Second)
 	defer timer.Stop()
 	for range timer.C {
 		rtcps, err := s.videoSender.ReadRTCP()
