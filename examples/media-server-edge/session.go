@@ -5,16 +5,17 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v2"
 	"github.com/pion/webrtc/v2/examples/internal/signal"
+	"time"
 )
 
 type Session struct {
-	Id               string
-	StreamId         string
-	pc               *webrtc.PeerConnection
-	videoSenderTrack *webrtc.Track
-	audioSenderTrack *webrtc.Track
-	VideoChan        chan []byte
-	AudioChan        chan []byte
+	Id          string
+	StreamId    string
+	pc          *webrtc.PeerConnection
+	videoSender *webrtc.RTPSender
+	audioSender *webrtc.RTPSender
+	VideoChan   chan []byte
+	AudioChan   chan []byte
 }
 
 func CreateSession(viewId, streamId string) (*Session, string) {
@@ -29,7 +30,7 @@ func CreateSession(viewId, streamId string) (*Session, string) {
 	mediaEngine.RegisterCodec(webrtc.NewRTPOpusCodec(webrtc.DefaultPayloadTypeOpus, 48000))
 
 	settingEngine := webrtc.SettingEngine{}
-	//settingEngine.SetTrickle(true) // 실제로 받는 candidate가 없을 것임.
+	//settingEngine.SetTrickle(true)
 	settingEngine.SetLite(true)
 	settingEngine.SetNAT1To1IPs([]string{"3.112.113.96"}, webrtc.ICECandidateTypeHost)
 	settingEngine.SetEphemeralUDPPortRange(10000, 40000)
@@ -45,13 +46,12 @@ func CreateSession(viewId, streamId string) (*Session, string) {
 	if err != nil {
 		panic(err)
 	}
-	s.videoSenderTrack = vt.Sender().Track()
+	s.videoSender = vt.Sender()
 	at, err := peerConnection.AddTransceiverFromKind(webrtc.RTPCodecTypeAudio)
 	if err != nil {
 		panic(err)
 	}
-	s.audioSenderTrack = at.Sender().Track()
-
+	s.audioSender = at.Sender()
 	sd, err := peerConnection.CreateOffer(nil)
 	if err != nil {
 		panic(err)
@@ -88,6 +88,25 @@ func (s *Session) StartSession(sdp string) error {
 func (s *Session) run() {
 	go s.videoPump()
 	go s.audioPump()
+	go s.GetREMBPeriodically()
+}
+
+func (s *Session) GetREMBPeriodically() {
+	timer := time.NewTimer(time.Minute)
+	defer timer.Stop()
+	for range timer.C {
+		rtcps, err := s.videoSender.ReadRTCP()
+		if err != nil {
+			panic(err)
+		}
+		for _, v := range rtcps {
+			b, err := v.Marshal()
+			if err != nil {
+				panic(err)
+			}
+			println(string(b))
+		}
+	}
 }
 
 func (s *Session) videoPump() {
@@ -97,8 +116,8 @@ func (s *Session) videoPump() {
 			panic(err)
 		}
 		packet.Header.PayloadType = webrtc.DefaultPayloadTypeVP8
-		packet.Header.SSRC = s.videoSenderTrack.SSRC()
-		if writeErr := s.videoSenderTrack.WriteRTP(packet); writeErr != nil {
+		packet.Header.SSRC = s.videoSender.Track().SSRC()
+		if writeErr := s.audioSender.Track().WriteRTP(packet); writeErr != nil {
 			panic(writeErr)
 		}
 	}
@@ -111,8 +130,8 @@ func (s *Session) audioPump() {
 			panic(err)
 		}
 		packet.Header.PayloadType = webrtc.DefaultPayloadTypeOpus
-		packet.Header.SSRC = s.audioSenderTrack.SSRC()
-		if writeErr := s.audioSenderTrack.WriteRTP(packet); writeErr != nil {
+		packet.Header.SSRC = s.audioSender.Track().SSRC()
+		if writeErr := s.audioSender.Track().WriteRTP(packet); writeErr != nil {
 			panic(writeErr)
 		}
 	}
