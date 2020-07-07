@@ -96,20 +96,15 @@ func (s *Session) run() {
 }
 
 func (s *Session) GetREMBPeriodically() {
-	timer := time.NewTimer(time.Second)
+	timer := time.NewTicker(time.Second)
 	defer timer.Stop()
 	for range timer.C {
-		rtcps, err := s.videoSender.ReadRTCP()
+		b := make([]byte, 1500)
+		buf, err := s.videoSender.Read(b)
 		if err != nil {
 			panic(err)
 		}
-		for _, v := range rtcps {
-			b, err := v.Marshal()
-			if err != nil {
-				panic(err)
-			}
-			println(string(b))
-		}
+		println(buf)
 	}
 }
 
