@@ -104,7 +104,7 @@ func (s *Session) GetREMBPeriodically() {
 		if err != nil {
 			panic(err)
 		}
-		println(buf)
+		println(string(buf))
 	}
 }
 
